@@ -47,10 +47,10 @@ fi
 # Настройка самоподписного SSL-сертификата
 echo "Создаём самоподписной SSL-сертификат для домена ${DOMAIN} сроком на 10 лет..."
 
-CERT_DIR="/etc/3x-ui/ssl"
+CERT_DIR="/etc/ssl/self_signed_cert"
 mkdir -p "${CERT_DIR}"
 
-openssl req -x509 -newkey rsa:2048 -keyout "${CERT_DIR}/3x-ui.key" -out "${CERT_DIR}/3x-ui.crt" -days 3650 -nodes -subj "/CN=${DOMAIN}"
+openssl req -x509 -newkey rsa:2048 -keyout "${CERT_DIR}/self_signed.key" -out "${CERT_DIR}/self_signed.crt" -days 3650 -nodes -subj "/CN=${DOMAIN}"
 if [ $? -ne 0 ]; then
     echo "Ошибка создания SSL-сертификата. Проверьте openssl."
     exit 1
@@ -59,12 +59,13 @@ echo "SSL-сертификат создан успешно!"
 
 # Установка сертификатов в 3X-UI
 echo "Настраиваем 3X-UI для работы с SSL..."
-CONFIG_FILE="/etc/3x-ui/config.yaml"
-if [ -f "$CONFIG_FILE" ]; then
-    sed -i 's|sslcertfile:.*|sslcertfile: /etc/3x-ui/ssl/3x-ui.crt|' "$CONFIG_FILE"
-    sed -i 's|sslkeyfile:.*|sslkeyfile: /etc/3x-ui/ssl/3x-ui.key|' "$CONFIG_FILE"
+CONFIG_FILE_JSON="/usr/local/x-ui/bin/config.json"
+
+if [ -f "$CONFIG_FILE_JSON" ]; then
+    sed -i "s|\"sslcertfile\":.*|\"sslcertfile\": \"/etc/ssl/self_signed_cert/self_signed.crt\",|" "$CONFIG_FILE_JSON"
+    sed -i "s|\"sslkeyfile\":.*|\"sslkeyfile\": \"/etc/ssl/self_signed_cert/self_signed.key\",|" "$CONFIG_FILE_JSON"
 else
-    echo "Файл конфигурации 3X-UI не найден: $CONFIG_FILE"
+    echo "Файл конфигурации config.json не найден: $CONFIG_FILE_JSON. SSL-сертификаты не настроены."
     exit 1
 fi
 
@@ -75,7 +76,7 @@ systemctl restart x-ui
 # Проверка статуса 3X-UI
 if systemctl is-active --quiet x-ui; then
     echo "3X-UI успешно настроен и запущен!"
-    echo "URL: https://${DOMAIN}:54321"
+    echo "URL: https://${DOMAIN}:19599"
 else
     echo "Ошибка запуска 3X-UI. Проверьте настройки."
     journalctl -u x-ui -n 50
